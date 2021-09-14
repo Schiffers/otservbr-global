@@ -343,8 +343,13 @@ void Game::setGameState(GameState_t newState)
 	}
 }
 
-void Game::onPressHotkeyEquip(Player* player, uint16_t spriteid)
+void Game::onPressHotkeyEquip(uint32_t playerId, uint16_t spriteid)
 {
+	Player* player = getPlayerByID(playerId);
+	if (!player) {
+		return;
+	}
+
 	Item* item;
 	const ItemType& itemType = Item::items.getItemIdByClientId(spriteid);
 
@@ -3713,8 +3718,13 @@ void Game::playerBrowseField(uint32_t playerId, const Position& pos)
 	}
 }
 
-void Game::playerStowItem(Player* player, const Position& pos, uint16_t spriteId, uint8_t stackpos, uint8_t count, bool allItems)
+void Game::playerStowItem(uint32_t playerId, const Position& pos, uint16_t spriteId, uint8_t stackpos, uint8_t count, bool allItems)
 {
+	Player* player = getPlayerByID(playerId);
+	if (!player) {
+		return;
+	}
+
 	if (!player->isPremium()) {
 		player->sendCancelMessage(RETURNVALUE_YOUNEEDPREMIUMACCOUNT);
 		return;
@@ -3737,8 +3747,13 @@ void Game::playerStowItem(Player* player, const Position& pos, uint16_t spriteId
 	player->stowItem(item, count, allItems);
 }
 
-void Game::playerStashWithdraw(Player* player, uint16_t spriteId, uint32_t count, uint8_t)
+void Game::playerStashWithdraw(uint32_t playerId, uint16_t spriteId, uint32_t count, uint8_t)
 {
+	Player* player = getPlayerByID(playerId);
+	if (!player) {
+		return;
+	}
+
 	if (player->hasFlag(PlayerFlag_CannotPickupItem)) {
 		return;
 	}
@@ -5658,6 +5673,12 @@ bool Game::combatChangeHealth(Creature* attacker, Creature* target, CombatDamage
 					continue;
 				}
 
+				if (damage.primary.type == COMBAT_HEALING && target && target->getMonster()) {
+					if (target != attacker) {
+						return false;
+					}
+				}
+				
 				if (tmpPlayer == attackerPlayer && attackerPlayer != targetPlayer) {
 					ss.str({});
 					ss << "You heal " << target->getNameDescription() << " for " << damageString;
@@ -8618,14 +8639,6 @@ bool Game::reload(ReloadTypes_t reloadType)
 		}
 		case RELOAD_TYPE_RAIDS: return raids.reload() && raids.startup();
 
-		case RELOAD_TYPE_SPELLS: {
-			if (!g_spells->reload()) {
-				SPDLOG_WARN("[Game::reload] - Failed to reload spells.");
-				std::terminate();
-			}
-			return true;
-		}
-
 		case RELOAD_TYPE_SCRIPTS: {
 			// commented out stuff is TODO, once we approach further in revscriptsys
 			g_actions->clear(true);
@@ -8641,11 +8654,7 @@ bool Game::reload(ReloadTypes_t reloadType)
 		}
 
 		default: {
-			if (!g_spells->reload()) {
-				SPDLOG_WARN("[Game::reload] - Failed to reload spells.");
-				std::terminate();
-			}
-
+			
 			g_config.reload();
 			Npcs::reload();
 			raids.reload() && raids.startup();
